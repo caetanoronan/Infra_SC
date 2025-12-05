@@ -37,6 +37,7 @@ pip-delete-this-directory.txt
 
 # Dados Geográficos (muito grandes)
 bc25_sc_shapefile_2020-10-01/
+bc25_sc_shapefiles.zip
 *.shp
 *.shx
 *.dbf

@@ -18,6 +18,8 @@ from flask_cors import CORS
 from io import BytesIO
 from PIL import Image
 import time
+import zipfile
+import urllib.request
 
 # Configurar encoding UTF-8
 import io
@@ -35,9 +37,52 @@ SHAPEFILE_DIR = BASE_DIR / "bc25_sc_shapefile_2020-10-01"
 OUTPUT_DIR = BASE_DIR / "Mapas_prontos"
 TEMP_DIR = BASE_DIR / "temp_maps"
 
+# URL para download dos shapefiles (configurar após upload)
+SHAPEFILE_URL = os.environ.get("SHAPEFILE_URL", "")
+
 # Criar diretórios se não existirem
 OUTPUT_DIR.mkdir(exist_ok=True)
 TEMP_DIR.mkdir(exist_ok=True)
+
+# ==================== DOWNLOAD SHAPEFILES ====================
+
+def baixar_shapefiles():
+    """Baixa e extrai shapefiles se não existirem"""
+    if SHAPEFILE_DIR.exists() and any(SHAPEFILE_DIR.iterdir()):
+        print("[OK] Shapefiles já existem localmente")
+        return True
+    
+    if not SHAPEFILE_URL:
+        print("[WARN] SHAPEFILE_URL não configurada")
+        return False
+    
+    print(f"[DOWNLOAD] Baixando shapefiles de {SHAPEFILE_URL}...")
+    zip_path = BASE_DIR / "shapefiles_temp.zip"
+    
+    try:
+        # Download
+        urllib.request.urlretrieve(SHAPEFILE_URL, zip_path)
+        print(f"[OK] Download concluído: {zip_path.stat().st_size / (1024*1024):.1f} MB")
+        
+        # Extrair
+        print("[EXTRACT] Extraindo arquivos...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(BASE_DIR)
+        
+        # Remover zip temporário
+        zip_path.unlink()
+        
+        print(f"[OK] Shapefiles extraídos em {SHAPEFILE_DIR}")
+        return True
+    
+    except Exception as e:
+        print(f"[ERROR] Falha ao baixar shapefiles: {e}")
+        if zip_path.exists():
+            zip_path.unlink()
+        return False
+
+# Baixar shapefiles no startup
+baixar_shapefiles()
 
 # Cores das camadas
 COLORS = {
