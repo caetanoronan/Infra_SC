@@ -89,10 +89,19 @@
             limite_uf: {{color: '#000', weight: 3, fillOpacity: 0}}
         }};
         
+        // Contador de camadas carregadas
+        var camadasCarregadas = 0;
+        var totalCamadas = 15;
+        
         // Função para carregar GeoJSON
         function loadGeoJSON(filename, layerName, style) {{
             fetch('geojson_layers/' + filename)
-                .then(response => response.json())
+                .then(response => {{
+                    if (!response.ok) {{
+                        throw new Error('Erro HTTP: ' + response.status);
+                    }}
+                    return response.json();
+                }})
                 .then(data => {{
                     var layer = L.geoJSON(data, {{
                         style: style,
@@ -106,7 +115,9 @@
                             if (feature.properties) {{
                                 var popup = '<b>' + layerName + '</b><br>';
                                 for (var key in feature.properties) {{
-                                    popup += key + ': ' + feature.properties[key] + '<br>';
+                                    if (feature.properties[key]) {{
+                                        popup += key + ': ' + feature.properties[key] + '<br>';
+                                    }}
                                 }}
                                 layer.bindPopup(popup);
                             }}
@@ -115,10 +126,23 @@
                     
                     layerControl.addOverlay(layer, layerName);
                     
+                    // Incrementar contador
+                    camadasCarregadas++;
+                    console.log('✓ Carregado: ' + layerName + ' (' + camadasCarregadas + '/' + totalCamadas + ')');
+                    
                     // Remover loading quando todas as camadas carregarem
-                    document.getElementById('loading').style.display = 'none';
+                    if (camadasCarregadas >= totalCamadas) {{
+                        document.getElementById('loading').style.display = 'none';
+                        console.log('✅ Todas as camadas carregadas!');
+                    }}
                 }})
-                .catch(err => console.error('Erro ao carregar ' + filename, err));
+                .catch(err => {{
+                    console.error('❌ Erro ao carregar ' + filename + ':', err);
+                    camadasCarregadas++;
+                    if (camadasCarregadas >= totalCamadas) {{
+                        document.getElementById('loading').style.display = 'none';
+                    }}
+                }});
         }}
         
         // Carregar todas as camadas
