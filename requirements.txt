@@ -1,0 +1,8 @@
+Flask>=3.0.0
+Flask-Cors>=4.0.0
+folium>=0.15.0
+geopandas>=0.14.0
+shapely>=2.0.0
+numpy>=1.26.0
+pillow>=10.0.0
+playwright>=1.45.0
