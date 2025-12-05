@@ -179,4 +179,21 @@ Para dúvidas, sugestões ou reportar problemas:
 
 ⭐ Se este projeto foi útil, considere dar uma estrela! ⭐
 
-Acesse a versão online em: [https://seu-usuario.github.io/Infra_SC/](https://seu-usuario.github.io/Infra_SC/)
+## 🚀 Deploy (Render, sem Docker)
+- Runtime: Python 3.11
+- Variáveis: `HOST=0.0.0.0` (Render injeta `PORT`)
+- Comando de start: `playwright install --with-deps chromium && python app_gerador_mapas_final.py`
+- Acesso padrão: URL pública fornecida pelo Render
+
+## 🌐 Acesso Online
+
+**GitHub Pages:** [https://caetanoronan.github.io/Infra_SC/](https://caetanoronan.github.io/Infra_SC/)
+
+### Links Diretos:
+- 📄 [Página Inicial](https://caetanoronan.github.io/Infra_SC/index.html)
+- 🗺️ [Mapa Interativo](https://caetanoronan.github.io/Infra_SC/mapa_infraestrutura_dinamico.html)
+- 📊 [Relatório Estatístico](https://caetanoronan.github.io/Infra_SC/relatorio_infraestrutura.html)
+
+> **💡 Nota:** O mapa carrega 15 camadas GeoJSON otimizadas (total ~30 MB) dinamicamente para contornar o limite de 100 MB do GitHub.
+
+---
