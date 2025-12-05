@@ -1,0 +1,1262 @@
+"""
+Gera relatório estatístico visual em HTML do mapa de infraestrutura logística
+"""
+import geopandas as gpd
+import pandas as pd
+from pathlib import Path
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+
+BASE_DIR = Path(r"C:\Users\caetanoronan\OneDrive - UFSC\Área de Trabalho\Infra_SC\bc25_sc_shapefile_2020-10-01")
+
+# ============ CARREGAR DADOS ============
+print("📊 Carregando dados para relatório...")
+
+# 1. Rodovias
+roads = gpd.read_file(BASE_DIR / "rod_via_deslocamento_l.shp").to_crs("EPSG:3857")
+roads_fed = roads[roads["jurisdicao"] == "Federal"]
+roads_est = roads[roads["jurisdicao"] == "Estadual/Distrital"]
+
+# 2. Ferrovias
+ferrovias = gpd.read_file(BASE_DIR / "fer_trecho_ferroviario_l.shp").to_crs("EPSG:3857")
+
+# 3. Infraestrutura Aérea
+aer = gpd.read_file(BASE_DIR / "aer_pista_ponto_pouso_p.shp").to_crs("EPSG:4326")
+helipontos = aer[aer["tipopista"].str.contains("Heliponto", case=False, na=False)]
+constr_aer = gpd.read_file(BASE_DIR / "edf_edif_constr_aeroportuaria_p.shp").to_crs("EPSG:4326")
+
+# 4. Infraestrutura Marítima
+term_p = gpd.read_file(BASE_DIR / "hdv_atracadouro_terminal_p.shp").to_crs("EPSG:4326")
+term_a = gpd.read_file(BASE_DIR / "hdv_atracadouro_terminal_a.shp").to_crs("EPSG:4326")
+term_l = gpd.read_file(BASE_DIR / "hdv_atracadouro_terminal_l.shp").to_crs("EPSG:4326")
+
+# 5. Hidrovias
+hidrovias = gpd.read_file(BASE_DIR / "hdv_trecho_hidroviario_l.shp").to_crs("EPSG:3857")
+
+# 6. Dutos
+dutos = gpd.read_file(BASE_DIR / "dut_trecho_duto_l.shp").to_crs("EPSG:3857")
+
+# 7. Obras de Arte
+pontes = gpd.read_file(BASE_DIR / "tra_ponte_l.shp").to_crs("EPSG:4326")
+tuneis = gpd.read_file(BASE_DIR / "tra_tunel_l.shp").to_crs("EPSG:4326")
+viadutos = gpd.read_file(BASE_DIR / "tra_passagem_elevada_viaduto_l.shp").to_crs("EPSG:4326")
+
+# 8. Limites
+municipios = gpd.read_file(BASE_DIR / "lml_municipio_a.shp").to_crs("EPSG:4326")
+muni_merc = municipios.to_crs(3857)
+municipios["area_km2"] = muni_merc.geometry.area / 1e6
+q1, q2 = municipios["area_km2"].quantile([0.33, 0.66])
+municipios["porte"] = municipios["area_km2"].apply(lambda a: "Pequeno" if a <= q1 else ("Médio" if a <= q2 else "Grande"))
+
+# ============ CALCULAR DISTÂNCIAS ============
+print("📏 Calculando quilometragens...")
+km_fed = roads_fed.geometry.length.sum() / 1000
+km_est = roads_est.geometry.length.sum() / 1000
+km_fer = ferrovias.geometry.length.sum() / 1000
+km_hid = hidrovias.geometry.length.sum() / 1000
+km_dut = dutos.geometry.length.sum() / 1000
+
+# ============ GRÁFICO 1: COMPARAÇÃO DE ELEMENTOS ============
+print("📈 Gerando gráficos...")
+
+categories = [
+    "Rodovias\nFederais",
+    "Rodovias\nEstaduais",
+    "Ferrovias",
+    "Helipontos",
+    "Constr.\nAeropor.",
+    "Terminais\nMarítimos",
+    "Áreas\nPortuárias",
+    "Cais/Molhes",
+    "Pontes",
+    "Túneis",
+    "Viadutos",
+]
+
+values = [
+    len(roads_fed),
+    len(roads_est),
+    len(ferrovias),
+    len(helipontos),
+    len(constr_aer),
+    len(term_p),
+    len(term_a),
+    len(term_l),
+    len(pontes),
+    len(tuneis),
+    len(viadutos),
+]
+
+colors_bar = [
+    "#d73027", "#4575b4", "#7b3294", "#f46d43", "#3288bd",
+    "#e41a1c", "#e41a1c", "#4daf4a", "#8073ac", "#e08214", "#d01c8b"
+]
+
+fig1 = go.Figure(data=[
+    go.Bar(x=categories, y=values, marker=dict(color=colors_bar),
+           text=values, textposition="outside",
+           hovertemplate="<b>%{x}</b><br>Quantidade: %{y:,}<extra></extra>")
+])
+
+fig1.update_layout(
+    title="<b>Quantidade de Elementos por Categoria</b>",
+    xaxis_title="Tipo de Infraestrutura",
+    yaxis_title="Número de Elementos",
+    height=500,
+    template="plotly_white",
+    font=dict(size=12),
+    hovermode="x unified"
+)
+fig1.write_html("chart1_elementos.html")
+
+# ============ GRÁFICO 2: QUILOMETRAGEM DE VIAS ============
+fig2 = go.Figure(data=[
+    go.Bar(
+        x=["Rodovias\nFederais", "Rodovias\nEstaduais", "Ferrovias", "Hidrovias", "Dutos"],
+        y=[km_fed, km_est, km_fer, km_hid, km_dut],
+        marker=dict(color=["#d73027", "#4575b4", "#7b3294", "#2c7fb8", "#a6611a"]),
+        text=[f"{km_fed:,.0f} km", f"{km_est:,.0f} km", f"{km_fer:,.0f} km", 
+              f"{km_hid:,.0f} km", f"{km_dut:,.0f} km"],
+        textposition="outside",
+        hovertemplate="<b>%{x}</b><br>Distância: %{y:,.0f} km<extra></extra>"
+    )
+])
+
+fig2.update_layout(
+    title="<b>Extensão em Quilômetros</b>",
+    xaxis_title="Tipo de Via",
+    yaxis_title="Quilometragem (km)",
+    height=500,
+    template="plotly_white",
+    font=dict(size=12),
+    hovermode="x"
+)
+fig2.write_html("chart2_quilometragem.html")
+
+# ============ GRÁFICO 3: DISTRIBUIÇÃO DE MUNICÍPIOS POR PORTE ============
+porte_counts = municipios["porte"].value_counts()
+fig3 = go.Figure(data=[
+    go.Pie(
+        labels=porte_counts.index,
+        values=porte_counts.values,
+        marker=dict(colors=["#e5f5f9", "#99d8c9", "#2ca25f"]),
+        hovertemplate="<b>%{label}</b><br>Quantidade: %{value} municípios<br>Percentual: %{percent}<extra></extra>"
+    )
+])
+
+fig3.update_layout(
+    title="<b>Distribuição de Municípios por Porte</b>",
+    height=500,
+    font=dict(size=12)
+)
+fig3.write_html("chart3_municipios_porte.html")
+
+# ============ GRÁFICO 4: OBRAS DE ARTE ============
+fig4 = go.Figure(data=[
+    go.Bar(
+        x=["Pontes", "Túneis", "Viadutos"],
+        y=[len(pontes), len(tuneis), len(viadutos)],
+        marker=dict(color=["#8073ac", "#e08214", "#d01c8b"]),
+        text=[f"{len(pontes):,}", f"{len(tuneis):,}", f"{len(viadutos):,}"],
+        textposition="outside",
+        hovertemplate="<b>%{x}</b><br>Quantidade: %{y:,}<extra></extra>"
+    )
+])
+
+fig4.update_layout(
+    title="<b>Obras de Arte Especiais</b>",
+    xaxis_title="Tipo de Obra",
+    yaxis_title="Quantidade",
+    height=500,
+    template="plotly_white",
+    font=dict(size=12)
+)
+fig4.write_html("chart4_obras_arte.html")
+
+# ============ GRÁFICO 5: INFRAESTRUTURA MARÍTIMA ============
+fig5 = go.Figure(data=[
+    go.Bar(
+        x=["Terminais\n(Pontos)", "Áreas\nPortuárias", "Cais/Molhes"],
+        y=[len(term_p), len(term_a), len(term_l)],
+        marker=dict(color=["#ff0000", "#e41a1c", "#4daf4a"]),
+        text=[f"{len(term_p):,}", f"{len(term_a):,}", f"{len(term_l):,}"],
+        textposition="outside",
+        hovertemplate="<b>%{x}</b><br>Quantidade: %{y:,}<extra></extra>"
+    )
+])
+
+fig5.update_layout(
+    title="<b>Infraestrutura Marítima/Portuária</b>",
+    xaxis_title="Tipo de Infraestrutura",
+    yaxis_title="Quantidade de Elementos",
+    height=500,
+    template="plotly_white",
+    font=dict(size=12)
+)
+fig5.write_html("chart5_maritima.html")
+
+# ============ RELATÓRIO HTML CONSOLIDADO ============
+print("📄 Gerando relatório HTML consolidado...")
+
+html_content = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Estatístico - Mapa de Infraestrutura Logística SC</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: white;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #f5f7fa;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: #eee;
+            --card-bg: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --accent: #667eea;
+            --accent-dark: #764ba2;
+        }
+        
+        body.dark-mode {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1a6;
+            --border-color: #404040;
+            --card-bg: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            --accent: #8b9eff;
+            --accent-dark: #a78bfa;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+        
+        body.dark-mode {
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        body.dark-mode .container {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header {
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .content {
+            padding: 40px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        
+        .section {
+            margin-bottom: 50px;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        body.dark-mode .section h2 {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        body.dark-mode .stat-card {
+            background: var(--card-bg);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card .label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        body.dark-mode .stat-card .value {
+            color: var(--accent);
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid #eee;
+        }
+        
+        body.dark-mode .chart-container {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+        }
+        
+        .chart-container iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        .map-container {
+            width: 100%;
+            height: 700px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .map-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+        
+        body.dark-mode .footer {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-top-color: var(--border-color);
+        }
+        
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #ddd;
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+        
+        body.dark-mode .tabs-container {
+            border-bottom-color: var(--border-color);
+        }
+        
+        .tab-button {
+            padding: 12px 20px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        body.dark-mode .tab-button {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-color: transparent;
+        }
+        
+        .tab-button:hover {
+            background: #f5f5f5;
+            color: #667eea;
+        }
+        
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        body.dark-mode .tab-button:hover {
+            background: var(--bg-tertiary);
+            color: var(--accent);
+        }
+        
+        body.dark-mode .tab-button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        body.dark-mode .highlight {
+            background: rgba(255, 193, 7, 0.15);
+            border-left-color: #fbbf24;
+            color: var(--text-primary);
+        }
+        
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+        
+        /* Estilos para caixas de informação com melhor contraste */
+        .info-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+        
+        .info-box-blue {
+            background: #f0f4ff;
+            border-left-color: #667eea;
+            color: #1a1a2e;
+        }
+        
+        body.dark-mode .info-box-blue {
+            background: #1a2a4a;
+            border-left-color: #8b9eff;
+            color: #e4e4e7;
+        }
+        
+        .info-box-green {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        
+        body.dark-mode .info-box-green {
+            background: #1a3a2a;
+            border-left-color: #4ade80;
+            color: #86efac;
+        }
+        
+        .info-box-yellow {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        
+        body.dark-mode .info-box-yellow {
+            background: #3a3a1a;
+            border-left-color: #fbbf24;
+            color: #fcd34d;
+        }
+        
+        .info-box-light-blue {
+            background: #e7f3ff;
+            border-left-color: #0066cc;
+            color: #003d99;
+        }
+        
+        body.dark-mode .info-box-light-blue {
+            background: #1a2f4a;
+            border-left-color: #60a5fa;
+            color: #93c5fd;
+        }
+        
+        h3 {
+            color: var(--text-primary);
+        }
+        
+        h4 {
+            color: var(--text-primary);
+        }
+        
+        ul {
+            color: var(--text-primary);
+        }
+        
+        p {
+            color: var(--text-primary);
+        }
+        
+        strong {
+            color: var(--text-primary);
+        }
+        
+        em {
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Relatório Estatístico</h1>
+            <p>Mapa de Infraestrutura Logística - Santa Catarina</p>
+            <button id="toggleDarkMode" onclick="toggleDarkMode()" style="position: absolute; top: 20px; right: 20px; padding: 10px 15px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 5px; cursor: pointer; font-size: 1em;">🌙 Modo Escuro</button>
+        </div>
+        
+        <div class="content">
+            <!-- ABAS DE NAVEGAÇÃO -->
+            <div class="tabs-container">
+                <button class="tab-button active" onclick="switchTab('resumo')">📍 Resumo Geral</button>
+                <button class="tab-button" onclick="switchTab('mapa')">🗺️ Mapa Interativo</button>
+                <button class="tab-button" onclick="switchTab('rodovias')">🛣️ Rodovias</button>
+                <button class="tab-button" onclick="switchTab('ferrovias')">🚂 Ferrovias</button>
+                <button class="tab-button" onclick="switchTab('aerea')">✈️ Aérea</button>
+                <button class="tab-button" onclick="switchTab('maritima')">⛵ Marítima</button>
+                <button class="tab-button" onclick="switchTab('hidro-dutos')">🌊 Hidrovias/Dutos</button>
+                <button class="tab-button" onclick="switchTab('obras')">🌉 Obras de Arte</button>
+                <button class="tab-button" onclick="switchTab('limites')">🗺️ Limites</button>
+                <button class="tab-button" onclick="switchTab('graficos')">📊 Gráficos</button>
+                <button class="tab-button" onclick="switchTab('conclusao')">✅ Conclusão</button>
+            </div>
+            
+            <!-- RESUMO GERAL -->
+            <div id="resumo" class="tab-content active">
+                <div class="section">
+                    <h2>📍 Resumo Geral</h2>
+                    
+                    <div class="info-box info-box-yellow">
+                        <strong>📌 Objetivo do Projeto:</strong> Este relatório apresenta uma análise completa da infraestrutura logística 
+                        de Santa Catarina, incluindo rodovias, ferrovias, hidrovias, infraestrutura marítima, aérea e obras de arte especiais. 
+                        Os dados foram processados a partir de shapefiles georreferenciados do IBGE (2020) através de um mapa interativo 
+                        que integra 14 camadas de informações geográficas.
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Camadas de Dados</div>
+                            <div class="value">14</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Elementos Geográficos</div>
+                            <div class="value">10.250+</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Municípios Cobertos</div>
+                            <div class="value">295</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Quilometragem Total</div>
+                            <div class="value">3.500+ km</div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">🎯 Principais Resultados Encontrados:</h3>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #d73027; margin-bottom: 10px;">🛣️ Rede Rodoviária (Maior Componente)</h4>
+                        <p style="margin-bottom: 10px;">Santa Catarina possui <strong>7.900 rodovias</strong> mapeadas, totalizando mais de <strong>10.840 km</strong>. 
+                        A rede está dividida em:</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li><strong>2.782 rodovias federais</strong> (~4.700 km) - Responsáveis pelas principais conexões interestaduais</li>
+                            <li><strong>5.118 rodovias estaduais</strong> (~6.100 km) - Maior extensão, conectando municípios e regiões locais</li>
+                        </ul>
+                        <p><em>Conclusão:</em> A rede estadual é mais extensa que a federal, indicando investimento significativo em conectividade regional.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #7b3294; margin-bottom: 10px;">🚂 Infraestrutura Ferroviária</h4>
+                        <p style="margin-bottom: 10px;">O estado conta com <strong>74 trechos ferroviários</strong> com extensão total de <strong>500+ km</strong>.</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li>Representam uma alternativa logística importante para transporte de cargas pesadas e de longa distância</li>
+                            <li>Estrategicamente distribuídas para conectar centros econômicos principais</li>
+                        </ul>
+                        <p><em>Conclusão:</em> Infraestrutura ferroviária consolidada como complemento à malha rodoviária.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #e41a1c; margin-bottom: 10px;">⛵ Infraestrutura Marítima e Portuária</h4>
+                        <p style="margin-bottom: 10px;">Destaque importante com <strong>223 elementos marítimos</strong> mapeados:</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li><strong>144 terminais/atracadouros</strong> - Instalações pontuais para operações portuárias específicas</li>
+                            <li><strong>5 áreas portuárias</strong> - Complexos estruturados de maior porte com múltiplas capacidades operacionais</li>
+                            <li><strong>74 cais/molhes</strong> - Estruturas lineares de atracação ao longo da costa</li>
+                        </ul>
+                        <p><em>Conclusão:</em> SC possui infraestrutura portuária robusta, essencial para comércio marítimo e logística costeira no Atlântico Sul.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #2c7fb8; margin-bottom: 10px;">🌊 Hidrovias e Dutos</h4>
+                        <p style="margin-bottom: 10px;">Componentes especializados de transporte:</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li><strong>8 trechos hidroviários</strong> (~100 km) - Utilizados para navegação interior e transporte fluvial</li>
+                            <li><strong>11 dutos</strong> (~150 km) - Infraestrutura de distribuição de óleo, gás e produtos especiais</li>
+                        </ul>
+                        <p><em>Conclusão:</em> Oferecem alternativas estratégicas para setores específicos da economia.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #3288bd; margin-bottom: 10px;">✈️ Infraestrutura Aérea</h4>
+                        <p style="margin-bottom: 10px;">Rede de aviação com <strong>117 elementos</strong>:</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li><strong>22 helipontos</strong> - Pontos de pouso para helicópteros, estratégicos para resgate e operações especiais</li>
+                            <li><strong>95 construções aeroportuárias</strong> - Hangares, terminal de carga, estruturas de suporte aeroportuário</li>
+                        </ul>
+                        <p><em>Conclusão:</em> Rede de aviação distribuída geograficamente apoiando transporte aéreo de carga e pessoas.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #8073ac; margin-bottom: 10px;">🌉 Obras de Arte Especiais (Total: 1.622)</h4>
+                        <p style="margin-bottom: 10px;">Estruturas críticas para conectividade terrestre:</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li><strong>1.429 pontes</strong> - Maioria esmagadora, refletindo topografia complexa com rios, vales e depressões</li>
+                            <li><strong>150 viadutos/passagens elevadas</strong> - Permitem cruzamento de vias sem interrupção de tráfego</li>
+                            <li><strong>43 túneis</strong> - Indicam regiões montanhosas onde escavação foi necessária para continuidade viária</li>
+                        </ul>
+                        <p><em>Conclusão:</em> Investimento significativo em obras especiais demonstra complexidade geográfica e compromisso com conectividade.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4 style="color: #2ca25f; margin-bottom: 10px;">🗺️ Cobertura Territorial</h4>
+                        <p style="margin-bottom: 10px;">Distribuição geográfica abrangente:</p>
+                        <ul style="margin-left: 20px; margin-bottom: 10px;">
+                            <li><strong>295 municípios</strong> cobertos pelo mapa</li>
+                            <li><strong>Distribuição equilibrada:</strong> 98 municípios pequenos (33%), 97 médios (33%), 100 grandes (34%)</li>
+                            <li>Classificação baseada em área territorial através de cálculo de tercis (33º e 66º percentis)</li>
+                        </ul>
+                        <p><em>Conclusão:</em> Infraestrutura distribuída por todo o estado, atendendo municípios de variados tamanhos.</p>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">📊 Síntese dos Resultados:</h3>
+                    
+                    <div class="info-box info-box-green">
+                        <p><strong>✓ Resultado Final:</strong> O mapa de infraestrutura logística de Santa Catarina integra <strong>10.250+ elementos geográficos</strong> 
+                        organizados em 14 camadas de dados, representando uma malha completa de transporte e logística. 
+                        A predominância de rodovias (7.900) e obras de arte (1.622) indica uma infraestrutura terrestre bem desenvolvida, 
+                        complementada por infraestrutura portuária robusta (223 elementos) e recursos especializados (ferrovias, hidrovias, dutos, aviação). 
+                        Esta diversidade de modalidades de transporte posiciona Santa Catarina como um polo logístico estratégico no Sul do Brasil.</p>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">📚 Referência dos Dados:</h3>
+                    
+                    <div class="info-box info-box-light-blue">
+                        <p><strong>Fonte de Dados:</strong> Banco de Dados Geográfico Contínuo (BC25) - IBGE (2020)</p>
+                        <p style="margin-top: 8px;"><strong>Órgão Responsável:</strong> Instituto Brasileiro de Geografia e Estatística (IBGE)</p>
+                        <p style="margin-top: 8px;"><strong>Escala:</strong> 1:25.000</p>
+                        <p style="margin-top: 8px;"><strong>Sistema de Coordenadas:</strong> EPSG:4674 (SIRGAS 2000) → Reprojetado para EPSG:4326 (WGS84) para visualização em mapa web</p>
+                        <p style="margin-top: 8px;"><strong>Unidade Federativa:</strong> Santa Catarina, Brasil</p>
+                        <p style="margin-top: 8px;"><strong>Ano de Referência dos Dados:</strong> 2020</p>
+                        <p style="margin-top: 8px; font-style: italic;">Os dados utilizados neste projeto são públicos e fornecidos pelo IBGE como parte do compromisso 
+                        com a disponibilização de informação geográfica oficial do Brasil.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- MAPA INTERATIVO -->
+            <div id="mapa" class="tab-content">
+                <div class="section">
+                    <h2>🗺️ Mapa Interativo</h2>
+                    <div class="info-box info-box-yellow">
+                        <strong>ℹ️ Como usar:</strong> Este é o mapa interativo completo com todas as 14 camadas de infraestrutura logística. 
+                        Use o <strong>Controle de Camadas</strong> (canto superior direito) para ativar/desativar camadas. 
+                        Clique nos elementos para ver detalhes. Use <strong>Zoom +/-</strong> para ampliar/reduzir. 
+                        Arraste o mapa para navegar. O <strong>Compass</strong> (rosa dos ventos) no canto superior esquerdo ajuda na orientação.
+                    </div>
+                    <div style="width: 100%; height: 700px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <iframe src="mapa_infraestrutura_bc25_sc.html" style="width: 100%; height: 100%; border: none;"></iframe>
+                    </div>
+                </div>
+            </div>
+            <div id="rodovias" class="tab-content">
+                <div class="section">
+                    <h2>🛣️ Rodovias</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Total de Rodovias</div>
+                            <div class="value">7.900</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Rodovias Federais</div>
+                            <div class="value">2.782</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Rodovias Estaduais</div>
+                            <div class="value">5.118</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Extensão Total</div>
+                            <div class="value">10.840+ km</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #d73027;"></div>
+                            <span>Federais (#d73027)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #4575b4;"></div>
+                            <span>Estaduais (#4575b4)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- FERROVIAS -->
+            <div id="ferrovias" class="tab-content">
+                <div class="section">
+                    <h2>🚂 Ferrovias</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Trechos Ferroviários</div>
+                            <div class="value">74</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Extensão Total</div>
+                            <div class="value">500+ km</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #7b3294;"></div>
+                            <span>Ferrovias (#7b3294)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- INFRAESTRUTURA AÉREA -->
+            <div id="aerea" class="tab-content">
+                <div class="section">
+                    <h2>✈️ Infraestrutura Aérea</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Helipontos</div>
+                            <div class="value">22</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Construções Aeroportuárias</div>
+                            <div class="value">95</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Aéreo</div>
+                            <div class="value">117</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #f46d43;"></div>
+                            <span>Helipontos (#f46d43)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #3288bd;"></div>
+                            <span>Construções Aeroportuárias (#3288bd)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- INFRAESTRUTURA MARÍTIMA -->
+            <div id="maritima" class="tab-content">
+                <div class="section">
+                    <h2>⛵ Infraestrutura Marítima/Portuária</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Terminais/Atracadouros</div>
+                            <div class="value">144</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Áreas Portuárias</div>
+                            <div class="value">5</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Cais/Molhes</div>
+                            <div class="value">74</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Marítimo</div>
+                            <div class="value">223</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff0000;"></div>
+                            <span>Terminais (#ff0000)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #e41a1c;"></div>
+                            <span>Áreas Portuárias (#e41a1c)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #4daf4a;"></div>
+                            <span>Cais/Molhes (#4daf4a)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- HIDROVIAS E DUTOS -->
+            <div id="hidro-dutos" class="tab-content">
+                <div class="section">
+                    <h2>🌊 Hidrovias e Dutos</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Hidrovias</div>
+                            <div class="value">8</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Extensão Hidrovias</div>
+                            <div class="value">100+ km</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Dutos</div>
+                            <div class="value">11</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Extensão Dutos</div>
+                            <div class="value">150+ km</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #2c7fb8;"></div>
+                            <span>Hidrovias (#2c7fb8)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #a6611a;"></div>
+                            <span>Dutos (#a6611a)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- OBRAS DE ARTE -->
+            <div id="obras" class="tab-content">
+                <div class="section">
+                    <h2>🌉 Obras de Arte Especiais</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Pontes</div>
+                            <div class="value">1.429</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Túneis</div>
+                            <div class="value">43</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Viadutos</div>
+                            <div class="value">150</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Obras</div>
+                            <div class="value">1.622</div>
+                        </div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #8073ac;"></div>
+                            <span>Pontes (#8073ac)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #e08214;"></div>
+                            <span>Túneis (#e08214)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #d01c8b;"></div>
+                            <span>Viadutos (#d01c8b)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- LIMITES TERRITORIAIS -->
+            <div id="limites" class="tab-content">
+                <div class="section">
+                    <h2>🗺️ Limites Territoriais</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="label">Limite Estadual</div>
+                            <div class="value">1</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Pequeno Porte</div>
+                            <div class="value">98</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Médio Porte</div>
+                            <div class="value">97</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Grande Porte</div>
+                            <div class="value">100</div>
+                        </div>
+                    </div>
+                    <div class="highlight">
+                        <strong>📌 Classificação Municipal:</strong> Os 295 municípios estão classificados 
+                        em 3 categorias por porte (pequeno, médio e grande) baseado em área territorial.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- GRÁFICOS -->
+            <div id="graficos" class="tab-content">
+                <div class="section">
+                    <h2>📊 Visualizações Gráficas</h2>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 10px;">📈 Quantidade de Elementos por Categoria</h3>
+                    <div class="info-box info-box-blue" style="margin-bottom: 15px;">
+                        <strong>ℹ️ O que visualizar:</strong> Este gráfico mostra a quantidade total de elementos para cada tipo de infraestrutura logística. 
+                        As pontes dominam o mapa com 1.429 ocorrências, refletindo a densidade de estruturas especiais em Santa Catarina. 
+                        As rodovias federais e estaduais (com totais de 2.782 e 5.118) formam a base da malha de transporte terrestre. 
+                        Os terminais marítimos (144) destacam a importância portuária do estado. Útil para identificar qual tipo de infraestrutura 
+                        é mais predominante na região.
+                    </div>
+                    <div class="chart-container">
+                        <iframe src="chart1_elementos.html"></iframe>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 40px; margin-bottom: 10px;">📏 Extensão em Quilômetros</h3>
+                    <div class="info-box info-box-blue" style="margin-bottom: 15px;">
+                        <strong>ℹ️ O que visualizar:</strong> Diferente do gráfico anterior, este mostra a EXTENSÃO TOTAL em quilômetros de cada tipo de via. 
+                        As rodovias estaduais (linhas azuis) com ~6.100 km superam as federais (~4.700 km), indicando uma rede estadual mais extensa. 
+                        Ferrovias (500+ km) e hidrovias (100+ km) representam alternativas logísticas importantes. Dutos (150+ km) conectam centros de produção 
+                        e distribuição. Este gráfico é essencial para planejamento logístico, pois mostra o volume real de infraestrutura disponível em 
+                        quilometragem, não apenas quantidade de trechos.
+                    </div>
+                    <div class="chart-container">
+                        <iframe src="chart2_quilometragem.html"></iframe>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 40px; margin-bottom: 10px;">🗺️ Distribuição de Municípios por Porte</h3>
+                    <div class="info-box info-box-blue" style="margin-bottom: 15px;">
+                        <strong>ℹ️ O que visualizar:</strong> Este gráfico de pizza (composição percentual) mostra como os 295 municípios catarinenses 
+                        estão distribuídos em três categorias de porte territorial. A distribuição é praticamente equilibrada: 98 municípios pequenos (33%), 
+                        97 médios (33%) e 100 grandes (34%). Essa distribuição uniforme significa que a infraestrutura logística está dispersa por todo 
+                        o estado, necessitando atender municípios de tamanhos variados. Importante para entender a abrangência do mapa.
+                    </div>
+                    <div class="chart-container">
+                        <iframe src="chart3_municipios_porte.html"></iframe>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 40px; margin-bottom: 10px;">🌉 Obras de Arte Especiais</h3>
+                    <div class="info-box info-box-blue" style="margin-bottom: 15px;">
+                        <strong>ℹ️ O que visualizar:</strong> Este gráfico destaca as estruturas especiais necessárias para transpor obstáculos naturais e artificiais. 
+                        Com 1.429 pontes, Santa Catarina demonstra a complexidade do seu relevo com muitos rios e vales. Os 150 viadutos facilitam o cruzamento 
+                        de outras vias sem interrupção de tráfego. Os 43 túneis indicam regiões montanhosas onde escavação foi necessária. Juntos, esses elementos 
+                        (total de 1.622) representam investimentos significativos em infraestrutura para manter a conectividade do estado.
+                    </div>
+                    <div class="chart-container">
+                        <iframe src="chart4_obras_arte.html"></iframe>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 40px; margin-bottom: 10px;">⛵ Infraestrutura Marítima/Portuária</h3>
+                    <div class="info-box info-box-blue" style="margin-bottom: 15px;">
+                        <strong>ℹ️ O que visualizar:</strong> Este gráfico revela a infraestrutura portuária de Santa Catarina. Os 144 terminais/atracadouros 
+                        (pontos vermelhos) são instalações individuais para operações específicas. As 5 áreas portuárias (vermelho escuro) são complexos maiores 
+                        e mais estruturados. Os 74 cais/molhes (verde) são estruturas lineares de atracação. Juntos, esses 223 elementos formam uma rede portuária 
+                        robusta que suporta o comércio marítimo e logística costeira de SC, um estado com importante acesso ao Atlântico Sul.
+                    </div>
+                    <div class="chart-container">
+                        <iframe src="chart5_maritima.html"></iframe>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CONCLUSÃO -->
+            <div id="conclusao" class="tab-content">
+                <div class="section">
+                    <h2>✅ Conclusão</h2>
+                    
+                    <div class="info-box info-box-green">
+                        <p><strong>✓ Resultado Final:</strong> O mapa de infraestrutura logística de Santa Catarina integra <strong>10.250+ elementos geográficos</strong> 
+                        organizados em 14 camadas de dados, representando uma malha completa de transporte e logística. 
+                        A predominância de rodovias (7.900) e obras de arte (1.622) indica uma infraestrutura terrestre bem desenvolvida, 
+                        complementada por infraestrutura portuária robusta (223 elementos) e recursos especializados (ferrovias, hidrovias, dutos, aviação). 
+                        Esta diversidade de modalidades de transporte posiciona Santa Catarina como um polo logístico estratégico no Sul do Brasil.</p>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">🎯 Principais Constatações:</h3>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4>1️⃣ Predominância da Malha Rodoviária</h4>
+                        <p>Com 7.900 rodovias totalizando mais de 10.840 km, a infraestrutura rodoviária é o backbone da logística catarinense. 
+                        A distribuição equilibrada entre rodovias federais (2.782) e estaduais (5.118) garante conectividade em múltiplos níveis, 
+                        desde conexões interestaduais até integração municipal.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4>2️⃣ Complexidade Topográfica Refletida em Obras de Arte</h4>
+                        <p>Os 1.622 elementos de obras de arte (1.429 pontes, 150 viadutos, 43 túneis) revelam um relevo desafiador. 
+                        Essa quantidade significativa de estruturas especiais demonstra investimento contínuo em infraestrutura para garantir 
+                        continuidade viária mesmo em terrenos complexos com rios, vales e depressões.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4>3️⃣ Infraestrutura Portuária Robusta</h4>
+                        <p>Os 223 elementos de infraestrutura marítima (144 terminais, 5 áreas portuárias, 74 cais/molhes) posicionam Santa Catarina 
+                        como um importante polo logístico costeiro no Atlântico Sul. Essa infraestrutura é vital para comércio internacional e 
+                        escoamento de produção estadual.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4>4️⃣ Modalidades de Transporte Complementares</h4>
+                        <p>Além de rodovias, o estado conta com 74 trechos ferroviários (500+ km), 8 hidrovias (100+ km) e 11 dutos (150+ km). 
+                        Essa diversidade oferece alternativas logísticas especializadas para diferentes tipos de carga e operações, 
+                        reduzindo dependência exclusiva de transporte rodoviário.</p>
+                    </div>
+                    
+                    <div class="info-box info-box-blue">
+                        <h4>5️⃣ Cobertura Geográfica Equilibrada</h4>
+                        <p>A distribuição praticamente uniforme dos 295 municípios em categorias de porte (33% pequeno, 33% médio, 34% grande) 
+                        indica que a infraestrutura logística está dispersa por todo o estado, atendendo municípios de variados tamanhos e 
+                        contribuindo para integração territorial.</p>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">💡 Implicações Estratégicas:</h3>
+                    
+                    <div class="info-box info-box-light-blue">
+                        <ul style="margin-left: 20px;">
+                            <li><strong>Planejamento Urbano:</strong> A infraestrutura existente deve servir como base para planejamento de novos desenvolvimentos, 
+                            evitando duplicações e maximizando eficiência.</li>
+                            <li><strong>Mobilidade de Carga:</strong> A diversidade de modalidades permite otimizar rotas e modais conforme tipo de mercadoria, 
+                            volume e destino.</li>
+                            <li><strong>Competitividade Logística:</strong> A robustez da infraestrutura posiciona SC como destino atrativo para investimentos 
+                            em logística e distribuição no mercado sul-americano.</li>
+                            <li><strong>Manutenção Preventiva:</strong> Com 10.250+ elementos, a gestão e manutenção preventiva são cruciais para 
+                            preservar o investimento realizado.</li>
+                            <li><strong>Integração Multimodal:</strong> Oportunidade de desenvolver hubs multimodais que conectem rodovias, ferrovias, 
+                            hidrovias e portos para máxima eficiência logística.</li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">📊 Comparativo de Abrangência:</h3>
+                    
+                    <div class="info-box info-box-yellow">
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; color: var(--text-primary);">
+                            <tr style="background: rgba(255,255,255,0.1);">
+                                <th style="padding: 10px; text-align: left; border-bottom: 2px solid;">Categoria</th>
+                                <th style="padding: 10px; text-align: center; border-bottom: 2px solid;">Quantidade</th>
+                                <th style="padding: 10px; text-align: center; border-bottom: 2px solid;">Extensão</th>
+                                <th style="padding: 10px; text-align: left; border-bottom: 2px solid;">Importância</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Rodovias (Federais)</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">2.782</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">~4.700 km</td>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Conexões interestaduais</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Rodovias (Estaduais)</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">5.118</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">~6.100 km</td>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Conectividade regional</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Pontes</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">1.429</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">—</td>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Continuidade viária</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Terminais Marítimos</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">144</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">—</td>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Logística portuária</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Ferrovias</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">74</td>
+                                <td style="padding: 10px; text-align: center; border-bottom: 1px solid;">~500 km</td>
+                                <td style="padding: 10px; border-bottom: 1px solid;">Transporte de carga</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 10px;">Hidrovias</td>
+                                <td style="padding: 10px; text-align: center;">8</td>
+                                <td style="padding: 10px; text-align: center;">~100 km</td>
+                                <td style="padding: 10px;">Transporte fluvial</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">🚀 Recomendações Finais:</h3>
+                    
+                    <div class="info-box info-box-green">
+                        <ol style="margin-left: 20px; line-height: 1.8;">
+                            <li><strong>Manutenção Sistematizada:</strong> Implementar programa de manutenção preventiva para os 10.250+ elementos, 
+                            priorizando obras de arte (pontes, viadutos, túneis).</li>
+                            <li><strong>Modernização de Tecnologia:</strong> Integrar sistema de gestão inteligente de tráfego para otimizar fluxo 
+                            nas rodovias de maior movimento.</li>
+                            <li><strong>Planejamento Multimodal:</strong> Desenvolver corredores logísticos que integrem as diferentes modalidades 
+                            (rodovia-ferrovia, rodovia-porto, etc).</li>
+                            <li><strong>Investimento em Alternativas:</strong> Ampliar infraestrutura ferroviária e portuária para reduzir sobrecarga 
+                            da malha rodoviária.</li>
+                            <li><strong>Monitoramento Contínuo:</strong> Atualizar regularmente este mapa e relatório para acompanhar mudanças 
+                            na infraestrutura e identificar gargalos.</li>
+                        </ol>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">📌 Nota Final:</h3>
+                    
+                    <div class="info-box info-box-light-blue">
+                        <p>Este relatório apresenta uma fotografia da infraestrutura logística de Santa Catarina em 2020. 
+                        Os dados do IBGE (BC25) forneceram a base geográfica oficial para mapeamento de 14 camadas de transportes. 
+                        A análise revelou um estado com infraestrutura bem distribuída, diversificada em modalidades e adequadamente 
+                        estruturada para apoiar atividades logísticas e comerciais. No entanto, como toda infraestrutura, requer 
+                        manutenção contínua, modernização e planejamento estratégico para permanecer competitiva e eficiente nos 
+                        próximos anos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Relatório gerado automaticamente | Autor: Ronan Armando Caetano</p>
+        </div>
+    </div>
+    
+    <script>
+        // Verificar preferência de modo escuro salva
+        function initDarkMode() {
+            const isDarkMode = localStorage.getItem('darkMode') === 'true';
+            if (isDarkMode) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('toggleDarkMode').textContent = '☀️ Modo Claro';
+            }
+        }
+        
+        // Alternar modo escuro
+        function toggleDarkMode() {
+            const body = document.body;
+            const button = document.getElementById('toggleDarkMode');
+            
+            body.classList.toggle('dark-mode');
+            const isDarkMode = body.classList.contains('dark-mode');
+            
+            // Salvar preferência
+            localStorage.setItem('darkMode', isDarkMode);
+            
+            // Atualizar texto do botão
+            button.textContent = isDarkMode ? '☀️ Modo Claro' : '🌙 Modo Escuro';
+        }
+        
+        function switchTab(tabName) {
+            // Ocultar todos os conteúdos de abas
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tab => tab.classList.remove('active'));
+            
+            // Remover active de todos os botões
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Mostrar a aba selecionada
+            document.getElementById(tabName).classList.add('active');
+            
+            // Adicionar active ao botão clicado
+            event.target.classList.add('active');
+        }
+        
+        // Inicializar modo escuro ao carregar a página
+        window.addEventListener('DOMContentLoaded', initDarkMode);
+    </script>
+</body>
+</html>
+"""
+
+with open("relatorio_infraestrutura.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print("✅ Relatório gerado com sucesso!")
+print("\n📁 Arquivos gerados:")
+print("   • relatorio_infraestrutura.html (relatório principal)")
+print("   • chart1_elementos.html")
+print("   • chart2_quilometragem.html")
+print("   • chart3_municipios_porte.html")
+print("   • chart4_obras_arte.html")
+print("   • chart5_maritima.html")
+print("\n🌐 Abra 'relatorio_infraestrutura.html' no seu navegador para visualizar o relatório completo!")
