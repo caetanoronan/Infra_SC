@@ -366,6 +366,9 @@ def criar_mapa_customizado(selected_layers, nome_arquivo="mapa_customizado"):
     # Adicionar controle de camadas
     folium.LayerControl(position="topright", collapsed=False).add_to(mapa)
     
+    # Garantir que TEMP_DIR existe
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    
     # Salvar HTML temporário
     html_path = TEMP_DIR / "{}.html".format(nome_arquivo)
     mapa.save(str(html_path))
@@ -452,8 +455,12 @@ def visualizar_mapa(nome_arquivo):
     """Visualiza o mapa gerado"""
     html_path = TEMP_DIR / "{}.html".format(nome_arquivo)
     
+    print(f"[DEBUG] Looking for map at: {html_path}")
+    print(f"[DEBUG] File exists: {html_path.exists()}")
+    print(f"[DEBUG] TEMP_DIR contents: {list(TEMP_DIR.glob('*')) if TEMP_DIR.exists() else 'DIR NOT EXISTS'}")
+    
     if not html_path.exists():
-        return "Map not found", 404
+        return "Map not found. Please generate a map first.", 404
     
     with open(str(html_path), 'r', encoding='utf-8') as f:
         return f.read()
