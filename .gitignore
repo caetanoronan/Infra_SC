@@ -55,3 +55,21 @@ bc25_sc_shapefile_2020-10-01/
 .env
 .env.local
 Thumbs.db
+
+# Arquivos HTML não-comprimidos (usar versões .min.html)
+mapa_infraestrutura_bc25_sc.html
+relatorio_infraestrutura.html
+chart1_elementos.html
+chart2_quilometragem.html
+chart3_municipios_porte.html
+chart4_obras_arte.html
+chart5_maritima.html
+mapa_completo.py
+mapa_interativo_sc.html
+mapa_infraestrutura_sc_completo.html
+mapa_infraestrutura_sc.html
+
+# Arquivos de compressão temporários
+*.html.gz
+*.min.html.gz
+
