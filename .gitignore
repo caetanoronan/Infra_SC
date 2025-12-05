@@ -72,4 +72,5 @@ mapa_infraestrutura_sc.html
 # Arquivos de compressão temporários
 *.html.gz
 *.min.html.gz
+*.min.html
 
