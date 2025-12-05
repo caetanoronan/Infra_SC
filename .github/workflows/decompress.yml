@@ -1,0 +1,33 @@
+name: Decompress Files for GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  decompress:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Decompress gzip files
+        run: |
+          python3 decompress.py
+      
+      - name: Commit decompressed files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add mapa_infraestrutura_bc25_sc.html relatorio_infraestrutura.html
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto: Decompressed files for GitHub Pages" && git push)
