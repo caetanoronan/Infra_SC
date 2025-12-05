@@ -179,11 +179,18 @@ Para dúvidas, sugestões ou reportar problemas:
 
 ⭐ Se este projeto foi útil, considere dar uma estrela! ⭐
 
-## 🚀 Deploy (Render, sem Docker)
-- Runtime: Python 3.11
-- Variáveis: `HOST=0.0.0.0` (Render injeta `PORT`)
-- Comando de start: `playwright install --with-deps chromium && python app_gerador_mapas_final.py`
-- Acesso padrão: URL pública fornecida pelo Render
+## 🚀 Deploy Online
+
+**Instruções completas:** [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)
+
+### Deploy Rápido (Render)
+1. Crie conta: https://dashboard.render.com
+2. New Web Service → Conecte repo `caetanoronan/Infra_SC`
+3. Runtime: Python 3 | Start: `playwright install --with-deps chromium && python app_gerador_mapas_final.py`
+4. Env vars: `HOST=0.0.0.0`, `SHAPEFILE_URL=https://github.com/caetanoronan/Infra_SC/releases/download/v1.0.0-data/bc25_sc_shapefiles.zip`
+5. Deploy! (5-8 min)
+
+**Shapefiles:** Baixados automaticamente da [Release v1.0.0-data](https://github.com/caetanoronan/Infra_SC/releases/tag/v1.0.0-data)
 
 ## 🌐 Acesso Online
 
