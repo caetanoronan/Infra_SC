@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Mapas Customizados - Infraestrutura SC</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            height: 90vh;
+        }
+        
+        .sidebar {
+            background: white;
+            padding: 25px;
+            overflow-y: auto;
+            border-right: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .map-container {
+            position: relative;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 1.3em;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+        
+        .scrollable-content {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section h3 {
+            font-size: 0.95em;
+            color: #333;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .layer-group {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .layer-group h4 {
+            font-size: 0.85em;
+            color: #667eea;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            margin-right: 8px;
+            accent-color: #667eea;
+        }
+        
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 0.85em;
+            color: #555;
+            flex: 1;
+            user-select: none;
+        }
+        
+        .checkbox-item label:hover {
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .checkbox-item .color-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            margin-bottom: 15px;
+            border-left: 4px solid #1976d2;
+        }
+        
+        .counter {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 0.85em;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-family: inherit;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        #mapa {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .status {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 0.85em;
+            border-left: 4px solid #2e7d32;
+            display: none;
+        }
+        
+        .status.show {
+            display: block;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left-color: #c62828;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            padding: 8px;
+            font-size: 0.85em;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            display: inline-block;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .modal.show {
+            display: block;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid #eee;
+                max-height: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="header">
+                <h1>🗺️ Gerador de Mapas</h1>
+                <p>Customize e exporte em PNG</p>
+            </div>
+            
+            <div class="info-box">
+                📌 Selecione camadas, nomeie o arquivo e clique em "Gerar"
+            </div>
+            
+            <div class="counter">
+                Camadas: <span id="layer-count">0</span>
+            </div>
+            
+            <div class="status" id="status"></div>
+            
+            <div class="scrollable-content" id="layers-container"></div>
+            
+            <div class="input-group">
+                <label for="nome-arquivo">Nome do arquivo:</label>
+                <input type="text" id="nome-arquivo" placeholder="mapa_infraestrutura" value="mapa_infraestrutura">
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" id="btn-gerar">
+                    <i class="fas fa-map"></i> Gerar Mapa
+                </button>
+                <button class="btn btn-success" id="btn-exportar" disabled>
+                    <i class="fas fa-image"></i> Exportar PNG
+                </button>
+                <button class="btn btn-secondary" id="btn-limpar">
+                    <i class="fas fa-redo"></i> Limpar
+                </button>
+            </div>
+            
+            <div class="loading" id="loading">
+                <span class="spinner"></span>
+                Processando...
+            </div>
+        </div>
+        
+        <!-- MAPA -->
+        <div class="map-container">
+            <div id="mapa"></div>
+        </div>
+    </div>
+    
+    <!-- Modal de Visualização -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Visualizar Mapa</h2>
+            <p id="modal-message"></p>
+            <button class="btn btn-primary" id="btn-visualizar" style="margin-top: 15px;">
+                Abrir no Navegador
+            </button>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    
+    <script>
+        // ============= CONFIG =============
+        const API_BASE = 'http://localhost:5000/api';
+        let mapGerado = false;
+        let currentMapURL = null;
+        
+        // ============= INICIALIZAR MAPA =============
+        const map = L.map('mapa', {
+            preferCanvas: true,
+            minZoom: 5,
+            maxZoom: 12
+        }).setView([-27.5, -49.5], 7);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // ============= FUNÇÕES =============
+        async function carregarCamadas() {
+            try {
+                const response = await fetch(`${API_BASE}/layers`);
+                const data = await response.json();
+                renderizarCamadas(data);
+            } catch (error) {
+                showStatus('Erro ao carregar camadas', true);
+                console.error(error);
+            }
+        }
+        
+        function renderizarCamadas(data) {
+            const container = document.getElementById('layers-container');
+            container.innerHTML = '';
+            
+            Object.entries(data).forEach(([category, layers]) => {
+                const section = document.createElement('div');
+                section.className = 'section';
+                
+                const categoryNames = {
+                    'transportes': '🚗 Transportes Terrestres',
+                    'obras_arte': '🌉 Obras de Arte',
+                    'maritima': '⚓ Marítima e Fluvial',
+                    'aviacao': '✈️ Aviação',
+                    'limites': '🏛️ Limites'
+                };
+                
+                const h3 = document.createElement('h3');
+                h3.textContent = categoryNames[category] || category;
+                section.appendChild(h3);
+                
+                layers.forEach(layer => {
+                    const group = document.createElement('div');
+                    group.className = 'layer-group';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = layer.id;
+                    checkbox.value = layer.id;
+                    checkbox.addEventListener('change', updateLayerCount);
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = layer.id;
+                    
+                    const dot = document.createElement('span');
+                    dot.className = 'color-dot';
+                    dot.style.backgroundColor = layer.color;
+                    
+                    const text = document.createTextNode(layer.name);
+                    
+                    label.appendChild(dot);
+                    label.appendChild(text);
+                    
+                    group.appendChild(checkbox);
+                    group.appendChild(label);
+                    section.appendChild(group);
+                });
+                
+                container.appendChild(section);
+            });
+        }
+        
+        function updateLayerCount() {
+            const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+            document.getElementById('layer-count').textContent = checked;
+        }
+        
+        function getSelectedLayers() {
+            const selected = [];
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+                selected.push(checkbox.value);
+            });
+            return selected;
+        }
+        
+        function showStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.classList.add('show');
+            status.classList.toggle('error', isError);
+            setTimeout(() => status.classList.remove('show'), 5000);
+        }
+        
+        async function gerarMapa() {
+            const layers = getSelectedLayers();
+            if (layers.length === 0) {
+                showStatus('❌ Selecione pelo menos uma camada!', true);
+                return;
+            }
+            
+            const nome = document.getElementById('nome-arquivo').value.trim() || 'mapa_customizado';
+            
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('btn-gerar').disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE}/gerar-mapa`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ layers, nome })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentMapURL = data.url;
+                    mapGerado = true;
+                    showStatus(`✅ ${data.message}`);
+                    document.getElementById('btn-exportar').disabled = false;
+                    
+                    // Carregar mapa no iframe/nova aba
+                    if (data.url) {
+                        const mapFrame = document.getElementById('mapa');
+                        mapFrame.innerHTML = `<iframe src="${data.url}" style="width: 100%; height: 100%; border: none;"></iframe>`;
+                    }
+                } else {
+                    showStatus(`❌ ${data.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`❌ Erro: ${error.message}`, true);
+                console.error(error);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('btn-gerar').disabled = false;
+            }
+        }
+        
+        async function exportarPNG() {
+            if (!mapGerado) {
+                showStatus('❌ Gere um mapa primeiro!', true);
+                return;
+            }
+            
+            const nome = document.getElementById('nome-arquivo').value.trim() || 'mapa_customizado';
+            
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('btn-exportar').disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE}/exportar-png`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus(`✅ ${data.message}`);
+                } else {
+                    showStatus(`❌ ${data.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`❌ Erro: ${error.message}`, true);
+                console.error(error);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('btn-exportar').disabled = !mapGerado;
+            }
+        }
+        
+        function limparSelecao() {
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            updateLayerCount();
+            showStatus('🔄 Seleção limpa');
+            mapGerado = false;
+            document.getElementById('btn-exportar').disabled = true;
+        }
+        
+        // ============= EVENT LISTENERS =============
+        document.getElementById('btn-gerar').addEventListener('click', gerarMapa);
+        document.getElementById('btn-exportar').addEventListener('click', exportarPNG);
+        document.getElementById('btn-limpar').addEventListener('click', limparSelecao);
+        
+        // ============= INICIALIZAR =============
+        carregarCamadas();
+    </script>
+</body>
+</html>
