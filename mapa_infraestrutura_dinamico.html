@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Infraestrutura Logística - Santa Catarina</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
+        
+        .info-box {{
+            padding: 10px;
+            background: white;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+        }}
+        
+        .legend {{
+            line-height: 18px;
+            color: #555;
+        }}
+        
+        .legend i {{
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }}
+        
+        .loading {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 9999;
+            font-family: Arial, sans-serif;
+        }}
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">
+        <h3>🗺️ Carregando Mapa...</h3>
+        <p>Aguarde enquanto carregamos as camadas de infraestrutura.</p>
+    </div>
+    
+    <div id="map"></div>
+    
+    <script>
+        // Criar mapa
+        var map = L.map('map').setView([-27.5, -50.5], 7);
+        
+        // Adicionar tiles
+        L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            maxZoom: 12,
+            minZoom: 5
+        }}).addTo(map);
+        
+        // Controle de camadas
+        var layerControl = L.control.layers(null, null, {{collapsed: false}}).addTo(map);
+        
+        // Cores para cada tipo
+        var styles = {{
+            rodovias: {{color: '#e31a1c', weight: 2}},
+            ferrovias: {{color: '#7b3294', weight: 3}},
+            hidrovias: {{color: '#2c7fb8', weight: 2}},
+            dutos: {{color: '#a6611a', weight: 2}},
+            pontes: {{color: '#8073ac', weight: 3}},
+            tuneis: {{color: '#e08214', weight: 3}},
+            viadutos: {{color: '#d01c8b', weight: 3}},
+            pistas_pouso: {{color: '#f46d43', fillColor: '#f46d43', fillOpacity: 0.6}},
+            construcoes_aero: {{color: '#3288bd', fillColor: '#3288bd', fillOpacity: 0.4}},
+            terminais_pontos: {{color: '#ff0000', fillColor: '#ff0000', fillOpacity: 0.7, radius: 5}},
+            terminais_areas: {{color: '#e41a1c', fillColor: '#e41a1c', fillOpacity: 0.3}},
+            terminais_linhas: {{color: '#4daf4a', weight: 3}},
+            cais_molhes: {{color: '#006837', weight: 2}},
+            municipios: {{color: '#666', weight: 1, fillOpacity: 0.05}},
+            limite_uf: {{color: '#000', weight: 3, fillOpacity: 0}}
+        }};
+        
+        // Função para carregar GeoJSON
+        function loadGeoJSON(filename, layerName, style) {{
+            fetch('geojson_layers/' + filename)
+                .then(response => response.json())
+                .then(data => {{
+                    var layer = L.geoJSON(data, {{
+                        style: style,
+                        pointToLayer: function(feature, latlng) {{
+                            if (style.radius) {{
+                                return L.circleMarker(latlng, style);
+                            }}
+                            return L.marker(latlng);
+                        }},
+                        onEachFeature: function(feature, layer) {{
+                            if (feature.properties) {{
+                                var popup = '<b>' + layerName + '</b><br>';
+                                for (var key in feature.properties) {{
+                                    popup += key + ': ' + feature.properties[key] + '<br>';
+                                }}
+                                layer.bindPopup(popup);
+                            }}
+                        }}
+                    }});
+                    
+                    layerControl.addOverlay(layer, layerName);
+                    
+                    // Remover loading quando todas as camadas carregarem
+                    document.getElementById('loading').style.display = 'none';
+                }})
+                .catch(err => console.error('Erro ao carregar ' + filename, err));
+        }}
+        
+        // Carregar todas as camadas
+        loadGeoJSON('rodovias.geojson', '🛣️ Rodovias', styles.rodovias);
+        loadGeoJSON('ferrovias.geojson', '🚂 Ferrovias', styles.ferrovias);
+        loadGeoJSON('hidrovias.geojson', '🌊 Hidrovias', styles.hidrovias);
+        loadGeoJSON('dutos.geojson', '⚙️ Dutos', styles.dutos);
+        loadGeoJSON('pontes.geojson', '🌉 Pontes', styles.pontes);
+        loadGeoJSON('tuneis.geojson', '🚇 Túneis', styles.tuneis);
+        loadGeoJSON('viadutos.geojson', '🌉 Viadutos', styles.viadutos);
+        loadGeoJSON('pistas_pouso.geojson', '✈️ Pistas de Pouso', styles.pistas_pouso);
+        loadGeoJSON('construcoes_aero.geojson', '✈️ Construções Aeroportuárias', styles.construcoes_aero);
+        loadGeoJSON('terminais_pontos.geojson', '⚓ Terminais (Pontos)', styles.terminais_pontos);
+        loadGeoJSON('terminais_areas.geojson', '⚓ Áreas Portuárias', styles.terminais_areas);
+        loadGeoJSON('terminais_linhas.geojson', '⚓ Atracadouros', styles.terminais_linhas);
+        loadGeoJSON('cais_molhes.geojson', '⚓ Cais e Molhes', styles.cais_molhes);
+        loadGeoJSON('municipios.geojson', '🗺️ Municípios', styles.municipios);
+        loadGeoJSON('limite_uf.geojson', '🗺️ Limite SC', styles.limite_uf);
+        
+        // Adicionar escala
+        L.control.scale().addTo(map);
+    </script>
+</body>
+</html>
