@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Mapas Customizados - Infraestrutura SC</title>
+    
+    <!-- Folium/Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.min.css" />
+    
+    <!-- Leaflet Image Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            height: 90vh;
+        }
+        
+        .sidebar {
+            background: white;
+            padding: 25px;
+            overflow-y: auto;
+            border-right: 1px solid #eee;
+        }
+        
+        .map-container {
+            position: relative;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        
+        .header h1 {
+            font-size: 1.4em;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+        }
+        
+        .section h3 {
+            font-size: 1em;
+            color: #333;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .layer-group {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .layer-group h4 {
+            font-size: 0.9em;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin-right: 10px;
+            accent-color: #667eea;
+        }
+        
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 0.9em;
+            color: #555;
+            flex: 1;
+            user-select: none;
+        }
+        
+        .checkbox-item label:hover {
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .checkbox-item .color-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 8px;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        #mapa {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .status {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            border-left: 4px solid #2e7d32;
+            display: none;
+        }
+        
+        .status.show {
+            display: block;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left-color: #c62828;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            margin-bottom: 15px;
+            border-left: 4px solid #1976d2;
+        }
+        
+        .counter {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            padding: 10px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            display: inline-block;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .legend {
+            background: rgba(255,255,255,0.95);
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 2px;
+            margin-right: 8px;
+        }
+        
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid #eee;
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="header">
+                <h1>🗺️ Gerador de Mapas</h1>
+                <p>Customize camadas e exporte em PNG</p>
+            </div>
+            
+            <div class="info-box">
+                📌 Selecione as camadas desejadas e clique em "Gerar PNG"
+            </div>
+            
+            <div class="counter">
+                Camadas selecionadas: <span id="layer-count">0</span>
+            </div>
+            
+            <div class="status" id="status"></div>
+            
+            <!-- TRANSPORTES TERRESTRES -->
+            <div class="section">
+                <h3>🚗 Transportes Terrestres</h3>
+                <div class="layer-group">
+                    <h4>Rodovias</h4>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="rodovias-federais" checked>
+                        <label for="rodovias-federais">
+                            <span class="color-dot" style="background: #e41a1c;"></span>
+                            Rodovias Federais
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="rodovias-estaduais" checked>
+                        <label for="rodovias-estaduais">
+                            <span class="color-dot" style="background: #377eb8;"></span>
+                            Rodovias Estaduais
+                        </label>
+                    </div>
+                </div>
+                <div class="layer-group">
+                    <h4>Ferrovias</h4>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="ferrovias">
+                        <label for="ferrovias">
+                            <span class="color-dot" style="background: #7b3294;"></span>
+                            Ferrovias
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- OBRAS DE ARTE -->
+            <div class="section">
+                <h3>🌉 Obras de Arte</h3>
+                <div class="layer-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pontes">
+                        <label for="pontes">
+                            <span class="color-dot" style="background: #8073ac;"></span>
+                            Pontes
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="tuneis">
+                        <label for="tuneis">
+                            <span class="color-dot" style="background: #e08214;"></span>
+                            Túneis
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="viadutos">
+                        <label for="viadutos">
+                            <span class="color-dot" style="background: #d01c8b;"></span>
+                            Viadutos
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- MARÍTIMA E FLUVIAL -->
+            <div class="section">
+                <h3>⚓ Marítima e Fluvial</h3>
+                <div class="layer-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="hidrovias">
+                        <label for="hidrovias">
+                            <span class="color-dot" style="background: #2c7fb8;"></span>
+                            Hidrovias
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="dutos">
+                        <label for="dutos">
+                            <span class="color-dot" style="background: #a6611a;"></span>
+                            Dutos
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="terminais">
+                        <label for="terminais">
+                            <span class="color-dot" style="background: #e41a1c;"></span>
+                            Terminais Portuários
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AVIAÇÃO -->
+            <div class="section">
+                <h3>✈️ Aviação</h3>
+                <div class="layer-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="helipontos">
+                        <label for="helipontos">
+                            <span class="color-dot" style="background: #f46d43;"></span>
+                            Helipontos
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="construcoes-aero">
+                        <label for="construcoes-aero">
+                            <span class="color-dot" style="background: #3288bd;"></span>
+                            Construções Aeroportuárias
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- LIMITES -->
+            <div class="section">
+                <h3>🏛️ Limites Político-Administrativos</h3>
+                <div class="layer-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="limite-uf" checked>
+                        <label for="limite-uf">
+                            <span class="color-dot" style="background: #333;"></span>
+                            Limite Estadual
+                        </label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="municipios">
+                        <label for="municipios">
+                            <span class="color-dot" style="background: #999;"></span>
+                            Municípios
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AÇÕES -->
+            <div class="button-group">
+                <button class="btn btn-primary" id="btn-gerar">
+                    📥 Gerar PNG
+                </button>
+                <button class="btn btn-secondary" id="btn-limpar">
+                    🔄 Limpar Seleção
+                </button>
+            </div>
+            
+            <div class="loading" id="loading">
+                <span class="spinner"></span>
+                Processando...
+            </div>
+        </div>
+        
+        <!-- MAPA -->
+        <div class="map-container">
+            <div id="mapa"></div>
+        </div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-image/0.4.0/leaflet-image.umd.js"></script>
+    
+    <script>
+        // ============= INICIALIZAR MAPA =============
+        const map = L.map('mapa', {
+            preferCanvas: true,
+            minZoom: 5,
+            maxZoom: 12
+        }).setView([-27.5, -49.5], 7);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // ============= DADOS DAS CAMADAS =============
+        const layersData = {
+            'rodovias-federais': { name: 'Rodovias Federais', color: '#e41a1c', weight: 2 },
+            'rodovias-estaduais': { name: 'Rodovias Estaduais', color: '#377eb8', weight: 2 },
+            'ferrovias': { name: 'Ferrovias', color: '#7b3294', weight: 2.2 },
+            'pontes': { name: 'Pontes', color: '#8073ac', weight: 1.8 },
+            'tuneis': { name: 'Túneis', color: '#e08214', weight: 2 },
+            'viadutos': { name: 'Viadutos', color: '#d01c8b', weight: 2 },
+            'hidrovias': { name: 'Hidrovias', color: '#2c7fb8', weight: 2.5 },
+            'dutos': { name: 'Dutos', color: '#a6611a', weight: 2 },
+            'terminais': { name: 'Terminais', color: '#e41a1c', weight: 2 },
+            'helipontos': { name: 'Helipontos', color: '#f46d43', weight: 1 },
+            'construcoes-aero': { name: 'Construções Aero', color: '#3288bd', weight: 1 },
+            'limite-uf': { name: 'Limite Estadual', color: '#333', weight: 3 },
+            'municipios': { name: 'Municípios', color: '#999', weight: 1 }
+        };
+        
+        // ============= FUNÇÕES =============
+        function updateLayerCount() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            document.getElementById('layer-count').textContent = checkboxes.length;
+        }
+        
+        function showStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.classList.add('show');
+            if (isError) {
+                status.classList.add('error');
+            } else {
+                status.classList.remove('error');
+            }
+            setTimeout(() => status.classList.remove('show'), 5000);
+        }
+        
+        function getSelectedLayers() {
+            const selected = [];
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+                if (layersData[checkbox.id]) {
+                    selected.push(checkbox.id);
+                }
+            });
+            return selected;
+        }
+        
+        function generatePNG() {
+            const selectedLayers = getSelectedLayers();
+            
+            if (selectedLayers.length === 0) {
+                showStatus('❌ Selecione pelo menos uma camada!', true);
+                return;
+            }
+            
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('btn-gerar').disabled = true;
+            
+            setTimeout(() => {
+                try {
+                    // Usar html2canvas para capturar o mapa
+                    html2canvas(document.getElementById('mapa'), {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                        useCORS: true,
+                        allowTaint: true
+                    }).then(canvas => {
+                        // Criar link de download
+                        const link = document.createElement('a');
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        const filename = `mapa_infraestrutura_${timestamp}.png`;
+                        
+                        link.href = canvas.toDataURL('image/png');
+                        link.download = filename;
+                        link.click();
+                        
+                        showStatus(`✅ PNG gerado: ${filename}`);
+                        document.getElementById('loading').classList.remove('show');
+                        document.getElementById('btn-gerar').disabled = false;
+                    }).catch(error => {
+                        showStatus(`❌ Erro ao gerar PNG: ${error.message}`, true);
+                        document.getElementById('loading').classList.remove('show');
+                        document.getElementById('btn-gerar').disabled = false;
+                    });
+                } catch (error) {
+                    showStatus(`❌ Erro: ${error.message}`, true);
+                    document.getElementById('loading').classList.remove('show');
+                    document.getElementById('btn-gerar').disabled = false;
+                }
+            }, 500);
+        }
+        
+        function clearSelection() {
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateLayerCount();
+            showStatus('🔄 Seleção limpa');
+        }
+        
+        // ============= EVENT LISTENERS =============
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', updateLayerCount);
+        });
+        
+        document.getElementById('btn-gerar').addEventListener('click', generatePNG);
+        document.getElementById('btn-limpar').addEventListener('click', clearSelection);
+        
+        // Inicializar contador
+        updateLayerCount();
+        
+        // ============= ADICIONAR ALGUNS EXEMPLOS DE CAMADAS =============
+        // Aqui você pode adicionar GeoJSON de exemplo ou carregar de arquivos
+        
+        // Exemplo: Círculo para representar Florianópolis (capital)
+        L.circleMarker([-27.5935, -48.5482], {
+            radius: 8,
+            fillColor: '#ff7800',
+            color: '#000',
+            weight: 2,
+            opacity: 0.8,
+            fillOpacity: 0.8,
+            popup: 'Florianópolis - Capital'
+        }).addTo(map);
+    </script>
+</body>
+</html>
