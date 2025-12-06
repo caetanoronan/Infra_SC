@@ -198,8 +198,9 @@ Para dúvidas, sugestões ou reportar problemas:
 
 ### Links Diretos:
 - 📄 [Página Inicial](https://caetanoronan.github.io/Infra_SC/index.html)
-- 🗺️ [Mapa Interativo](https://caetanoronan.github.io/Infra_SC/mapa_infraestrutura_dinamico.html)
+- 🗺️ [Mapa Completo Interativo](https://caetanoronan.github.io/Infra_SC/mapa_infraestrutura_dinamico.html)
 - 📊 [Relatório Estatístico](https://caetanoronan.github.io/Infra_SC/relatorio_infraestrutura.html)
+- 🎨 [Gerador de Mapas Customizados](https://infra-sc.onrender.com) ⭐ **NOVO!**
 
 > **💡 Nota:** O mapa carrega 15 camadas GeoJSON otimizadas (total ~30 MB) dinamicamente para contornar o limite de 100 MB do GitHub.
 
