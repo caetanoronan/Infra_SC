@@ -578,7 +578,23 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showStatus(data.message + ' - Pasta: Mapas_prontos/');
+                    showStatus(`✅ ${data.message} - Baixando...`);
+                    
+                    // Baixar arquivo automaticamente
+                    if (data.download_url) {
+                        const downloadUrl = data.download_url.startsWith('http') 
+                            ? data.download_url 
+                            : `${window.location.protocol}//${window.location.host}${data.download_url}`;
+                        
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = data.filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        showStatus(`✅ ${data.message} - Download iniciado!`);
+                    }
                 } else {
                     showStatus(data.error, true);
                 }

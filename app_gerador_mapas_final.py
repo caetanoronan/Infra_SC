@@ -536,7 +536,8 @@ def exportar_png():
         return jsonify({
             'success': True,
             'message': 'PNG exportado: {}'.format(png_filename),
-            'filepath': str(png_path)
+            'filename': png_filename,
+            'download_url': '/download-png/{}'.format(png_filename)
         })
     
     except Exception as e:
@@ -544,6 +545,23 @@ def exportar_png():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/download-png/<filename>', methods=['GET'])
+def download_png(filename):
+    """Baixa o PNG gerado"""
+    from flask import send_file
+    
+    png_path = OUTPUT_DIR / filename
+    
+    if not png_path.exists():
+        return "PNG not found", 404
+    
+    return send_file(
+        str(png_path),
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=filename
+    )
 
 @app.route('/api/status', methods=['GET'])
 def status():
