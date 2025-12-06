@@ -84,6 +84,9 @@ def baixar_shapefiles():
 # Baixar shapefiles no startup
 baixar_shapefiles()
 
+# Cache de mapas HTML em memória (evita problemas com sistema de arquivos)
+MAPS_CACHE = {}
+
 # Cores das camadas
 COLORS = {
     'rodovias-federais': '#e41a1c',
@@ -366,17 +369,18 @@ def criar_mapa_customizado(selected_layers, nome_arquivo="mapa_customizado"):
     # Adicionar controle de camadas
     folium.LayerControl(position="topright", collapsed=False).add_to(mapa)
     
-    # Garantir que TEMP_DIR existe
-    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    # Salvar HTML em string (para cache em memória)
+    html_str = mapa._repr_html_()
     
-    # Salvar HTML temporário
+    # Também salvar em arquivo (backup)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
     html_path = TEMP_DIR / "{}.html".format(nome_arquivo)
     mapa.save(str(html_path))
     
     print("[OK] Map HTML generated: {}".format(html_path))
     print("[STAT] Total layers added: {}".format(camadas_adicionadas))
     
-    return html_path
+    return nome_arquivo, html_str
 
 # ==================== ROTAS FLASK ====================
 
@@ -436,10 +440,12 @@ def gerar_mapa():
         print("[LAYERS] {}".format(selected_layers))
         
         # Criar mapa
-        html_path = criar_mapa_customizado(selected_layers, nome_arquivo)
+        nome_arquivo, html_content = criar_mapa_customizado(selected_layers, nome_arquivo)
         
-        print("[GEN] Map saved to: {}".format(html_path))
-        print("[GEN] File exists: {}".format(html_path.exists()))
+        # Armazenar HTML em cache
+        MAPS_CACHE[nome_arquivo] = html_content
+        
+        print("[GEN] Map cached with key: {}".format(nome_arquivo))
         
         # Retornar URL do mapa
         return jsonify({
@@ -456,17 +462,27 @@ def gerar_mapa():
 @app.route('/visualizar/<nome_arquivo>', methods=['GET'])
 def visualizar_mapa(nome_arquivo):
     """Visualiza o mapa gerado"""
+    
+    # Primeiro tenta buscar do cache em memória
+    if nome_arquivo in MAPS_CACHE:
+        print(f"[VIEW] Serving map from cache: {nome_arquivo}")
+        return MAPS_CACHE[nome_arquivo]
+    
+    # Fallback: tenta buscar do arquivo
     html_path = TEMP_DIR / "{}.html".format(nome_arquivo)
     
-    print(f"[DEBUG] Looking for map at: {html_path}")
-    print(f"[DEBUG] File exists: {html_path.exists()}")
-    print(f"[DEBUG] TEMP_DIR contents: {list(TEMP_DIR.glob('*')) if TEMP_DIR.exists() else 'DIR NOT EXISTS'}")
+    print(f"[VIEW] Cache miss, looking for file: {html_path}")
     
-    if not html_path.exists():
-        return "Map not found. Please generate a map first.", 404
+    if html_path.exists():
+        print(f"[VIEW] Serving map from file: {html_path}")
+        with open(str(html_path), 'r', encoding='utf-8') as f:
+            content = f.read()
+            # Adiciona ao cache para próximas requisições
+            MAPS_CACHE[nome_arquivo] = content
+            return content
     
-    with open(str(html_path), 'r', encoding='utf-8') as f:
-        return f.read()
+    print(f"[VIEW] Map not found: {nome_arquivo}")
+    return "Map not found. Please generate a map first.", 404
 
 @app.route('/api/exportar-png', methods=['POST'])
 def exportar_png():
