@@ -438,6 +438,9 @@ def gerar_mapa():
         # Criar mapa
         html_path = criar_mapa_customizado(selected_layers, nome_arquivo)
         
+        print("[GEN] Map saved to: {}".format(html_path))
+        print("[GEN] File exists: {}".format(html_path.exists()))
+        
         # Retornar URL do mapa
         return jsonify({
             'success': True,
