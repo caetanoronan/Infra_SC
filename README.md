@@ -205,3 +205,91 @@ Para dúvidas, sugestões ou reportar problemas:
 > **💡 Nota:** O mapa carrega 15 camadas GeoJSON otimizadas (total ~30 MB) dinamicamente para contornar o limite de 100 MB do GitHub.
 
 ---
+
+## 🔄 Replicar para Outros Estados/Países
+
+Este projeto foi desenvolvido para ser **100% replicável** em outros estados brasileiros ou países! 🌍
+
+### 📦 O que está disponível no repositório:
+- ✅ Todo o código-fonte (Python, HTML, CSS, JavaScript)
+- ✅ Scripts de geração de mapas e relatórios
+- ✅ Configurações de deploy (Dockerfile, requirements.txt)
+- ✅ Documentação completa (README, DEPLOY_GUIDE)
+- ✅ Template do gerador customizado com exportação PNG
+
+### 🛠️ Como adaptar para outro local:
+
+#### 1️⃣ Obter dados geográficos do local desejado
+
+**Para outros estados brasileiros:**
+- Baixar shapefiles BC25 do IBGE: https://www.ibge.gov.br/geociencias/downloads-geociencias.html
+- Escolher o estado desejado (ex: Rio Grande do Sul, Paraná, etc.)
+
+**Para outros países:**
+- OpenStreetMap: https://download.geofabrik.de/
+- Dados governamentais locais
+- Natural Earth: https://www.naturalearthdata.com/
+
+#### 2️⃣ Ajustar configurações no código
+
+Editar `app_gerador_mapas_final.py` (ou scripts de mapa):
+
+```python
+# Ajustar caminho dos shapefiles
+SHAPEFILE_DIR = BASE_DIR / "bc25_rs_shapefile_2020-10-01"  # Exemplo: RS
+
+# Ajustar coordenadas centrais do mapa
+mapa = folium.Map(
+    location=[-30.0, -51.2],  # Ex: Porto Alegre, RS
+    zoom_start=7,
+    ...
+)
+
+# Ajustar mapeamento de camadas (se nomes de arquivos mudarem)
+LAYER_MAPPING = {
+    'rodovias-federais': ('rod_via_deslocamento_l.shp', ...),
+    # Verificar nomes exatos dos arquivos .shp do novo local
+}
+```
+
+#### 3️⃣ Preparar dados para deploy
+
+```bash
+# Compactar shapefiles
+python prepare_shapefiles.py
+
+# Subir ZIP na GitHub Release do seu fork
+# Atualizar URL no Render: SHAPEFILE_URL=https://github.com/SEU_USUARIO/SEU_REPO/releases/download/...
+```
+
+#### 4️⃣ Deploy
+
+Seguir o mesmo processo do [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md):
+- Deploy no Render (ou outra plataforma)
+- Configurar variáveis de ambiente
+- Publicar no GitHub Pages
+
+### 🌎 Exemplos de adaptação:
+
+| Local | Ajustes Principais |
+|-------|-------------------|
+| **Outros Estados BR** | Apenas trocar shapefiles e coordenadas centrais |
+| **Portugal** | Adaptar nomes de colunas (ex: "jurisdição" → "jurisdiction") |
+| **EUA/Europa** | Usar dados OpenStreetMap; ajustar estrutura de dados |
+| **América Latina** | Similar ao Brasil; verificar formato dos shapefiles locais |
+
+### 💡 Dicas para adaptação:
+
+1. **Mantenha a estrutura**: Os scripts são genéricos e funcionam com qualquer shapefile
+2. **Verifique colunas**: Use `geopandas` para inspecionar nomes de colunas dos novos dados
+3. **Teste localmente**: Rode `python app_gerador_mapas_final.py` antes de fazer deploy
+4. **Documente mudanças**: Atualize README com informações do novo local
+
+### 📚 Recursos úteis:
+
+- **IBGE Geociências**: https://www.ibge.gov.br/geociencias.html
+- **GeoPandas Docs**: https://geopandas.org/
+- **Folium Docs**: https://python-visualization.github.io/folium/
+- **OpenStreetMap**: https://wiki.openstreetmap.org/
+
+---
