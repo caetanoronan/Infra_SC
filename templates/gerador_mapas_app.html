@@ -409,7 +409,11 @@
     
     <script>
         // ============= CONFIG =============
-        const API_BASE = 'http://localhost:5000/api';
+        // Detectar ambiente automaticamente (localhost ou produção)
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000/api'
+            : `${window.location.protocol}//${window.location.host}/api`;
+        
         let mapGerado = false;
         let currentMapURL = null;
         
@@ -512,7 +516,7 @@
         async function gerarMapa() {
             const layers = getSelectedLayers();
             if (layers.length === 0) {
-                showStatus('❌ Selecione pelo menos uma camada!', true);
+                showStatus('Selecione pelo menos uma camada!', true);
                 return;
             }
             
@@ -555,7 +559,7 @@
         
         async function exportarPNG() {
             if (!mapGerado) {
-                showStatus('❌ Gere um mapa primeiro!', true);
+                showStatus('Gere um mapa primeiro!', true);
                 return;
             }
             
@@ -574,12 +578,12 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showStatus(`✅ ${data.message}`);
+                    showStatus(data.message + ' - Pasta: Mapas_prontos/');
                 } else {
-                    showStatus(`❌ ${data.error}`, true);
+                    showStatus(data.error, true);
                 }
             } catch (error) {
-                showStatus(`❌ Erro: ${error.message}`, true);
+                showStatus('Erro ao exportar: ' + error.message, true);
                 console.error(error);
             } finally {
                 document.getElementById('loading').classList.remove('show');
