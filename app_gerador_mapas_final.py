@@ -516,15 +516,21 @@ def exportar_png():
         # Usar Playwright para converter HTML em PNG
         from playwright.sync_api import sync_playwright
         
+        # URL interna do próprio servidor (evita problemas de permissões com file://)
+        server_port = os.environ.get("PORT", "5000")
+        view_url = f"http://localhost:{server_port}/visualizar/{nome_arquivo}"
+        print(f"[INFO] Loading page for screenshot: {view_url}")
+
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 1920, 'height': 1080})
-            
-            # Abrir arquivo HTML
-            page.goto('file:///{}'.format(str(temp_path).replace('\\', '/')))
-            
-            # Aguardar mapa carregar completamente (espera tiles Leaflet)
-            page.wait_for_timeout(3000)
+            page.set_default_timeout(60000)  # aumenta timeout para redes lentas
+
+            # Abrir página servida pelo Flask (garante acesso a tiles remotos)
+            page.goto(view_url, wait_until="networkidle")
+
+            # Aguardar tiles/folium renderizarem
+            page.wait_for_timeout(4000)
             
             # Tirar screenshot
             page.screenshot(path=str(png_path), full_page=True)
